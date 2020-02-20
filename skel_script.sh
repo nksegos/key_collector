@@ -1,11 +1,11 @@
 #!/bin/bash
 
-GIT_URL="https://github.com/user/repo.git"
+GIT_URL="$1"
 HASH_LIST=$(mktemp)
 DIFF_FILE=$(mktemp)
 KEY_DIR=$(mktemp -d)
 
-trufflehog --regex  --entropy=False $GIT_URL | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u > $HASH_LIST
+trufflehog --regex  --entropy=False $GIT_URL | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $HASH_LIST
 
 if [[ "$(wc -l $HASH_LIST | awk -F" " '{print $1}')" -ne "0" ]]; then
 	GIT_DIR=$(mktemp -d)
