@@ -1,0 +1,5 @@
+trufflehog --regex  --entropy=False https://url.git | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u > hash_list
+
+git show hash | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" > diff_file
+
+awk '/^-----BEGIN [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{flag=1}/^-----END [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{print;flag=0}flag' diff_file
