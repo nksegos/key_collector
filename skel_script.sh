@@ -7,6 +7,11 @@ DIFF_FILE=$(mktemp)
 KEY_DIR=$(mktemp -d)
 GUSER=""
 
+hash_collector(){
+	trufflehog --regex  --entropy=False $(echo $1) | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed     -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" 
+}
+
+
 if [[ "$MODE" == "user" ]]; then
 	GUSER="$GIT_URL"
 	GIT_URL=""
@@ -14,9 +19,9 @@ if [[ "$MODE" == "user" ]]; then
 	curl -s "https://api.github.com/users/$GUSER/repos" | grep "clone_url" | awk -F\" '{print $4}' > $USER_REPOS
 else
 	if [[ "$MODE" == "local" ]]; then
-		trufflehog git_url --repo_path $GIT_URL --regex --entropy=False | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed -r "s/\x1B\[([0    -9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $HASH_LIST	
+		hash_collector "git_url --repo_path $GIT_URL" >  $HASH_LIST	
 	elif [[ "$MODE" == "remote" ]]; then
-		trufflehog --regex  --entropy=False $GIT_URL | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $HASH_LIST
+		hash_collector "$GIT_URL" >  $HASH_LIST	
 	fi
 
 	if [[ "$(wc -l $HASH_LIST | awk -F" " '{print $1}')" -ne "0" ]]; then
