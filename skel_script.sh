@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MODE="$1"
-GIT_URL="$2"
+PAYLOAD="$2"
 HASH_LIST=$(mktemp)
 DIFF_FILE=$(mktemp)
 KEY_DIR=$(mktemp -d)
@@ -13,51 +13,72 @@ hash_collector(){
 
 process_repo(){
 if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then
-		if [[ "$3" == "remote" ]]; then
-			GIT_DIR=$(mktemp -d)
-			git clone $1 $GIT_DIR > /dev/null 2>&1
-			cd $GIT_DIR
-		else
-			cd $1
-		fi
-		
-		cat $2 | while IFS= read -r line; do 		
-			DIFF_FILE=$(mktemp)
-			KEY_FILE=${KEY_DIR}/private_key_$(echo $1 | awk -F/ '{print $NF}' | awk -F. '{print $1}')_${line}
-			git show $line | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $DIFF_FILE; 
-			awk '/^-----BEGIN [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{flag=1}/^-----END [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{print;flag=0}flag' $DIFF_FILE > $KEY_FILE
-			if [[ "$(wc -l $KEY_FILE | awk -F" " '{print $1}')" == "0" ]]; then
-				rm -f $KEY_FILE > /dev/null 2>&1
-			fi
-			rm -f $DIFF_FILE > /dev/null 2>&1
-		done
-		cd /tmp/
-		if [[ "$3" == "remote" ]]; then
-			rm -rf $GIT_DIR > /dev/null 2>&1
-		fi
-		
-		if [[ "$(ls -1 $KEY_DIR | wc -l)" == "0" ]]; then
-			rmdir $KEY_DIR > /dev/null 2>&1
-			echo "No keys found."
-		else
-			echo "Collected keys at: $KEY_DIR"
-		fi
+	echo -e "High signal entropy detected by regexes for repo \"$1\".\n"
+	if [[ "$3" == "remote" ]]; then
+		GIT_DIR=$(mktemp -d)
+		git clone $1 $GIT_DIR > /dev/null 2>&1
+		cd $GIT_DIR
+	else
+		cd $1
 	fi
+		
+	cat $2 | while IFS= read -r line; do 		
+		DIFF_FILE=$(mktemp)
+		KEY_FILE=${KEY_DIR}/private_key_$(echo $1 | awk -F/ '{print $NF}' | awk -F. '{print $1}')_${line}
+		git show $line | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $DIFF_FILE; 
+		awk '/^-----BEGIN [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{flag=1}/^-----END [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{print;flag=0}flag' $DIFF_FILE > $KEY_FILE
+		if [[ "$(wc -l $KEY_FILE | awk -F" " '{print $1}')" == "0" ]]; then
+			rm -f $KEY_FILE > /dev/null 2>&1
+		fi
+		rm -f $DIFF_FILE > /dev/null 2>&1
+	done
+	cd /tmp/
+	if [[ "$3" == "remote" ]]; then
+		rm -rf $GIT_DIR > /dev/null 2>&1
+	fi
+
+	if [[ "$(ls -1 $KEY_DIR | wc -l)" == "0" ]]; then	
+		rmdir $KEY_DIR > /dev/null 2>&1
+		echo "No keys found for repo \"$1\"."
+	else
+		echo "Collected keys for repo \"$1\" at:\"$KEY_DIR\""
+	fi
+else 
+	echo "No private keys detected through high signal regexes for repo \"$1\"."
+fi
 }
 
 if [[ "$MODE" == "user" ]]; then
-	GUSER="$GIT_URL"
-	GIT_URL=""
+	GUSER=$PAYLOAD
 	USER_REPOS=$(mktemp)
 	curl -s "https://api.github.com/users/$GUSER/repos" | grep "clone_url" | awk -F\" '{print $4}' > $USER_REPOS
-
+	if [[ "$(wc -l $USER_REPOS | awk -F" " '{print $1}')" == "0" ]]; then
+		echo -e "\nUser \"$GUSER\" does not have any public repositories or does not exist\n"
+		exit 0
+	else
+		echo -e "\nProcessing the following repositories of user \"${GUSER}\":\n"
+		cat $USER_REPOS
+		echo -e "\n"
+	fi
+	
+	cat $USER_REPOS | while IFS= read -r line; do
+		GIT_URL=$line
+		hash_collector $GIT_URL > $HASH_LIST
+		process_repo $GIT_URL $HASH_LIST "remote"
+	done
 else
+	GIT_URL=$PAYLOAD
 	if [[ "$MODE" == "local" ]]; then
+		echo -e "\nProcessing local repo \"$GIT_URL\".\n"
 		hash_collector "git_url --repo_path $GIT_URL" >  $HASH_LIST
 	elif [[ "$MODE" == "remote" ]]; then
-		hash_collector "$GIT_URL" >  $HASH_LIST	
+		echo -e "\nProcessing remote repo \"$GIT_URL\".\n"
+		hash_collector $GIT_URL >  $HASH_LIST	
 	fi
 	process_repo $GIT_URL $HASH_LIST $MODE
 fi
+
+echo -e "\n"
+exit 0
 
 
