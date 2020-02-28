@@ -1,11 +1,71 @@
 #!/bin/bash
 
-MODE="$1"
-PAYLOAD="$2"
+MODE="local"
+PAYLOAD=$(pwd)
 HASH_LIST=$(mktemp)
 DIFF_FILE=$(mktemp)
 KEY_DIR=$(mktemp -d)
 GUSER=""
+
+
+Usage(){
+echo -e "\nUsage:"
+echo    " 		-m PROCESSING_MODE 	Sets the operating scope to: local_repo, remote_repo or github_user. The default mode is local."
+echo 	" 		-p PAYLOAD 		Depending on the PROCESSING_MODE, sets the local_repo path, the github_repo url or the github_user's name."
+echo  	" 		-h 			Display usage guide."
+echo -e "\nDefaults:"
+echo 	" 		MODE 	-> \"local\" "
+echo    " 		PAYLOAD -> \$PWD: \"$(pwd)\" "
+}
+
+
+while getopts "m:p:h" opt; do
+	case $opt in
+		m)
+			MODE=$OPTARG
+			;;
+		p)
+			PAYLOAD=$OPTARG
+			;;
+		h)
+			Usage
+			exit 0
+			;;
+		\?)
+			echo "Invalid option: -$OPTARG."
+			Usage
+			exit 1
+			;;
+		:)
+			echo "Option -$OPTARG requires an argument."
+			Usage
+			exit 1
+			;;
+	esac
+done
+
+
+
+if [[ "$MODE" != "local" ]] && [[ "$MODE" != "remote" ]] && [[ "$MODE" != "user" ]]; then
+	echo "Bad arguments!"
+	Usage
+	exit 1
+fi
+
+if [[ "$MODE" == "local" ]]; then
+	if [ -d $PAYLOAD ]; then
+	    	echo "Directory exists."
+		if [[ "${PAYLOAD: -1}" == "/" ]]; then
+			PAYLOAD=${PAYLOAD%?}
+		fi
+		if [ -d ${PAYLOAD}/.git ]; then
+			echo "Directory is a git repository."
+		else
+			echo "Directory \"$PAYLOAD\" is not a git repository."
+			exit 0
+		fi
+	fi
+fi
 
 hash_collector(){
 	trufflehog --regex  --entropy=False $(echo $1) | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" 
