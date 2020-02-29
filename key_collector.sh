@@ -5,13 +5,12 @@ PAYLOAD=$(pwd)
 HASH_LIST=$(mktemp)
 DIFF_FILE=$(mktemp)
 KEY_DIR=$(mktemp -d)
-GUSER=""
 
 
 Usage(){
 echo -e "\nUsage:"
-echo    " 		-m PROCESSING_MODE 	Sets the operating scope to: local_repo, remote_repo or github_user. The default mode is local."
-echo 	" 		-p PAYLOAD 		Depending on the PROCESSING_MODE, sets the local_repo path, the github_repo url or the github_user's name."
+echo    " 		-m PROCESSING_MODE 	Sets the operating scope to: local, remote or github_user. The default mode is local."
+echo 	" 		-p PAYLOAD 		Depending on the PROCESSING_MODE, sets the local repo path, the remote repo url or the github_user's name."
 echo  	" 		-h 			Display usage guide."
 echo -e "\nDefaults:"
 echo 	" 		MODE 	-> \"local\" "
@@ -45,27 +44,12 @@ while getopts "m:p:h" opt; do
 done
 
 
-
-if [[ "$MODE" != "local" ]] && [[ "$MODE" != "remote" ]] && [[ "$MODE" != "user" ]]; then
+if [[ "$MODE" != "local" ]] && [[ "$MODE" != "remote" ]] && [[ "$MODE" != "github_user" ]]; then
 	echo "Bad arguments!"
 	Usage
 	exit 1
 fi
 
-if [[ "$MODE" == "local" ]]; then
-	if [ -d $PAYLOAD ]; then
-	    	echo "Directory exists."
-		if [[ "${PAYLOAD: -1}" == "/" ]]; then
-			PAYLOAD=${PAYLOAD%?}
-		fi
-		if [ -d ${PAYLOAD}/.git ]; then
-			echo "Directory is a git repository."
-		else
-			echo "Directory \"$PAYLOAD\" is not a git repository."
-			exit 0
-		fi
-	fi
-fi
 
 hash_collector(){
 	trufflehog --regex  --entropy=False $(echo $1) | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" 
@@ -108,15 +92,24 @@ else
 fi
 }
 
-if [[ "$MODE" == "user" ]]; then
-	GUSER=$PAYLOAD
+
+
+if [[ "$MODE" == "github_user" ]]; then
+	URL_CHECK=$(curl -s --head "https://github.com/${PAYLOAD}/" | head -n 1 | awk -F" " '{print $(NF-1)" "$NF}')
+	if [[ "${URL_CHECK%?}" != "200 OK" ]] && [[ "${URL_CHECK%?}" != "200 " ]]; then
+		echo "The provided github user account \"$PAYLOAD\" does not exist or is private."
+		exit 1	
+	else
+		echo "Github user \"${PAYLOAD}\" exists."
+	fi
+	
 	USER_REPOS=$(mktemp)
-	curl -s "https://api.github.com/users/$GUSER/repos" | grep "clone_url" | awk -F\" '{print $4}' > $USER_REPOS
+	curl -s "https://api.github.com/users/${PAYLOAD}/repos" | grep "clone_url" | awk -F\" '{print $4}' > $USER_REPOS
 	if [[ "$(wc -l $USER_REPOS | awk -F" " '{print $1}')" == "0" ]]; then
-		echo -e "\nUser \"$GUSER\" does not have any public repositories or does not exist\n"
+		echo -e "\nUser \"$PAYLOAD\" does not have any public repositories or does not exist\n"
 		exit 0
 	else
-		echo -e "\nProcessing the following repositories of user \"${GUSER}\":\n"
+		echo -e "\nProcessing the following repositories:\n"
 		cat $USER_REPOS
 		echo -e "\n"
 	fi
@@ -126,17 +119,48 @@ if [[ "$MODE" == "user" ]]; then
 		hash_collector $GIT_URL > $HASH_LIST
 		process_repo $GIT_URL $HASH_LIST "remote"
 	done
+
 else
-	GIT_URL=$PAYLOAD
-	if [[ "$MODE" == "local" ]]; then
-		echo -e "\nProcessing local repo \"$GIT_URL\".\n"
-		hash_collector "git_url --repo_path $GIT_URL" >  $HASH_LIST
+ 	if [[ "$MODE" == "local" ]]; then
+		if [ -d $PAYLOAD ]; then
+	    		echo "Directory exists."
+			if [[ "${PAYLOAD: -1}" == "/" ]]; then
+				PAYLOAD=${PAYLOAD%?}
+			fi
+			if [ -d ${PAYLOAD}/.git ]; then
+				echo "Directory is a git repository."
+			else
+				echo "Directory \"$PAYLOAD\" is not a git repository."
+				exit 1
+			fi
+		else
+			echo "Directory \"$PAYLOAD\" does not exist."
+			exit 1
+		fi
+		echo -e "\nProcessing local repo \"$PAYLOAD\".\n"
+		hash_collector "git_url --repo_path $PAYLOAD" >  $HASH_LIST
 	elif [[ "$MODE" == "remote" ]]; then
-		echo -e "\nProcessing remote repo \"$GIT_URL\".\n"
-		hash_collector $GIT_URL >  $HASH_LIST	
+		URL_CHECK=$(curl -s --head "$PAYLOAD" | head -n 1 | awk -F" " '{print $(NF-1)" "$NF}')	
+		if [[ "${URL_CHECK%?}" != "200 OK" ]] && [[ "${URL_CHECK%?}" != "200 " ]]; then
+			echo "The provided url \"$PAYLOAD\" does not exist or is private."
+			exit 1
+		else
+			echo "URL is reachable."
+		fi
+		VALIDITY_CHECK=$(mktemp)
+		trufflehog $PAYLOAD > $VALIDITY_CHECK 2>&1	
+		if grep -q "fatal" $VALIDITY_CHECK; then
+			echo "Provided url \"$PAYLOAD\" is not a valid git repository."
+			exit 1
+		else
+			rm -rf $VALIDITY_CHECK
+		fi
+		echo -e "\nProcessing remote repo \"$PAYLOAD\".\n"
+		hash_collector $PAYLOAD >  $HASH_LIST	
 	fi
-	process_repo $GIT_URL $HASH_LIST $MODE
+	process_repo $PAYLOAD $HASH_LIST $MODE
 fi
+
 
 echo -e "\n"
 exit 0
