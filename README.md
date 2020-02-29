@@ -13,8 +13,8 @@
 ## Things that can be added
 Cookie, if you think that some of this shit is unneeded just cross it off and of course if you feel like something's missing, add it below.
 
-- Parallelism on user-based processing.
-- Multiple types of processing with one script execution through parameter file.
-- Parallelism for the idea above ^^.
-- Live printing of found keys on console
-- Grouping of keys on directories named after the repo
+- (<strong>UNEEDED</strong>)Parallelism on user-based processing.
+- (<strong>UNEEDED</strong>)Multiple types of processing with one script execution through parameter file.
+- (<strong>UNEEDED</strong>)Parallelism for the idea above ^^.
+- (<strong>IMPLEMENTED AS OPTIONAL KEY PRINT AT THE END OF EXECUTION</strong>)Live printing of found keys on console
+- (<strong>DONE</strong>)Grouping of keys on directories named after the repo 
