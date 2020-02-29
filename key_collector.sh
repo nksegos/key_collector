@@ -60,7 +60,7 @@ fi
 
 ## Define functions
 
-# Collect hashes with private keys from a repo. truffleHog exits with code 1 if it detects anything, so we have to turn of the error instant exit for this operation
+# Collect hashes with private keys from a repo. truffleHog exits with code 1 if it detects anything, so we have to turn off the error instant exit for this operation
 hash_collector(){
 	set +e
 	trufflehog --regex  --entropy=False $(echo $1) | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" 
