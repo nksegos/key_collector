@@ -205,9 +205,10 @@ fi
 # Final cleanup or key printing
 if [[ "$(ls -1 $KEY_DIR | wc -l)" == "0" ]]; then	
 	rmdir $KEY_DIR > /dev/null 2>&1
-elif [[ "$MODE" == "github_user" ]]; then
-	echo -e "\nCollected keys for all repos at:\"$KEY_DIR\""
+	echo -e "\n"
+	exit 0
 fi
+
 
 read -r -p "Print collected keys? [Y/n] " USER_REPLY
 
@@ -229,6 +230,10 @@ esac
 
 if [[ "$PRINT_FLAG" == "True" ]]; then
 	transverser $KEY_DIR
+fi
+
+if [[ "$MODE" == "github_user" ]]; then
+	echo -e "\nCollected keys for all repos at:\"$KEY_DIR\""
 fi
 
 echo -e "\n"
