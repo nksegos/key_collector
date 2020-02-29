@@ -1,12 +1,20 @@
 #!/bin/bash
 
+## Variable initialization
 MODE="local"
 PAYLOAD=$(pwd)
 HASH_LIST=$(mktemp)
 DIFF_FILE=$(mktemp)
 KEY_DIR=$(mktemp -d)
+PRINT_FLAG="False"
+USER_REPLY=""
 
+## Set bash strict mode
+set -e
+set -u
+set -o pipefail
 
+## Define help function
 Usage(){
 echo -e "\nUsage:"
 echo    " 		-m PROCESSING_MODE 	Sets the operating scope to: local, remote or github_user. The default mode is local."
@@ -17,7 +25,7 @@ echo 	" 		MODE 	-> \"local\" "
 echo    " 		PAYLOAD -> \$PWD: \"$(pwd)\" "
 }
 
-
+## Arg parsing
 while getopts "m:p:h" opt; do
 	case $opt in
 		m)
@@ -43,18 +51,23 @@ while getopts "m:p:h" opt; do
 	esac
 done
 
-
+# Very basic input sanitization
 if [[ "$MODE" != "local" ]] && [[ "$MODE" != "remote" ]] && [[ "$MODE" != "github_user" ]]; then
-	echo "Bad arguments!"
+	echo -e "\nBad arguments!"
 	Usage
 	exit 1
 fi
 
+## Define functions
 
+# Collect hashes with private keys from a repo. truffleHog exits with code 1 if it detects anything, so we have to turn of the error instant exit for this operation
 hash_collector(){
+	set +e
 	trufflehog --regex  --entropy=False $(echo $1) | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" 
+	set -e
 }
 
+# Loop through the collected hashes, git show each of them, strip the =/- signs and the color metadata and pass them through the private key regex. If repo is remote it's cloned, processed and then deleted. Any key detected by the regex gets saved as $KEY_DIR/$REPO_NAME/findings_from_hash_$COMMIT_HASH
 process_repo(){
 if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then	
 	echo -e "High signal entropy detected by regexes for repo \"$1\".\n"
@@ -67,10 +80,10 @@ if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then
 	fi
 	REPO_KEYS=${KEY_DIR}/$(basename $(git remote get-url origin) | awk -F. '{print $1}')	
 	mkdir $REPO_KEYS
-	cat $2 | while IFS= read -r line; do 		
+	cat $2 | while IFS= read -r commit_hash; do 		
 		DIFF_FILE=$(mktemp)
-		KEY_FILE=${REPO_KEYS}/findings_from_hash_${line}
-		git show $line | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $DIFF_FILE; 
+		KEY_FILE=${REPO_KEYS}/findings_from_hash_${commit_hash}
+		git show $commit_hash | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $DIFF_FILE; 
 		awk '/^-----BEGIN [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{flag=1}/^-----END [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{print;flag=0}flag' $DIFF_FILE > $KEY_FILE
 		if [[ "$(wc -l $KEY_FILE | awk -F" " '{print $1}')" == "0" ]]; then
 			rm -f $KEY_FILE > /dev/null 2>&1
@@ -93,19 +106,38 @@ else
 fi
 }
 
+# Transverse through the $KEY_DIR and print all relevant findings
+transverser(){
+	cd $1
+	for file in $1/*;do 	
+		if [ -d "$file" ]; then 
+			transverser "$file"
+			cd ..
+		else
+			echo -e "\n$file\n"
+			cat $file
+		fi
+    	done
+}
 
+## Program start
 
+# Main execution. Depending on the mode selected different input sanitizations and checks take place to ensure smooth execution
 if [[ "$MODE" == "github_user" ]]; then
+	set +e
 	URL_CHECK=$(curl -s --head "https://github.com/${PAYLOAD}/" | head -n 1 | awk -F" " '{print $(NF-1)" "$NF}')
+	set -e
 	if [[ "${URL_CHECK%?}" != "200 OK" ]] && [[ "${URL_CHECK%?}" != "200 " ]]; then
-		echo -e "\nThe provided github user account \"$PAYLOAD\" does not exist or is private."
+		echo -e "\n\"https://github.com/${PAYLOAD}\" does not exist or is private."
 		exit 1	
 	else
-		echo -e "\nGithub user \"${PAYLOAD}\" exists."
+		echo -e "\n\"https://github.com/${PAYLOAD}\" exists."
 	fi
 	
 	USER_REPOS=$(mktemp)
+	set +e
 	curl -s "https://api.github.com/users/${PAYLOAD}/repos" | grep "clone_url" | awk -F\" '{print $4}' > $USER_REPOS
+	set -e
 	if [[ "$(wc -l $USER_REPOS | awk -F" " '{print $1}')" == "0" ]]; then
 		echo -e "\nUser \"$PAYLOAD\" does not have any public repositories or does not exist\n"
 		exit 0
@@ -141,7 +173,9 @@ else
 		echo -e "\nProcessing local repo \"$PAYLOAD\".\n"
 		hash_collector "git_url --repo_path $PAYLOAD" >  $HASH_LIST
 	elif [[ "$MODE" == "remote" ]]; then
+		set +e
 		URL_CHECK=$(curl -s --head "$PAYLOAD" | head -n 1 | awk -F" " '{print $(NF-1)" "$NF}')	
+		set -e
 		if [[ "${URL_CHECK%?}" != "200 OK" ]] && [[ "${URL_CHECK%?}" != "200 " ]]; then
 			echo -e "\nThe provided url \"$PAYLOAD\" does not exist or is private."
 			exit 1
@@ -149,7 +183,9 @@ else
 			echo -e "\nURL is reachable."
 		fi
 		VALIDITY_CHECK=$(mktemp)
+		set +e
 		trufflehog $PAYLOAD > $VALIDITY_CHECK 2>&1	
+		set -e
 		if grep -q "fatal" $VALIDITY_CHECK; then
 			echo "Provided url \"$PAYLOAD\" is not a valid git repository."
 			exit 1
@@ -162,13 +198,36 @@ else
 	process_repo $PAYLOAD $HASH_LIST $MODE
 fi
 
+
+# Final cleanup or key printing
 if [[ "$(ls -1 $KEY_DIR | wc -l)" == "0" ]]; then	
 	rmdir $KEY_DIR > /dev/null 2>&1
 elif [[ "$MODE" == "github_user" ]]; then
 	echo -e "\nCollected keys for all repos at:\"$KEY_DIR\""
+else
+	read -r -p "Print collected keys? [Y/n] " USER_REPLY
+
+	case $USER_REPLY in
+    		[yY][eE][sS]|[yY])
+ 		PRINT_FLAG="True"
+		;;
+    		[nN][oO]|[nN])
+ 		PRINT_FLAG="False"
+       		;;
+	"")
+		PRINT_FLAG="True"	
+		;;
+	*)
+ 		PRINT_FLAG="False"
+ 		;;
+	esac
 fi
 
+if [[ "$PRINT_FLAG" == "True" ]]; then
+	transverser $KEY_DIR
+fi
 echo -e "\n"
+# Program exit
 exit 0
 
 
