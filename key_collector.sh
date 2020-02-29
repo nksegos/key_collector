@@ -69,7 +69,7 @@ if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then
 	mkdir $REPO_KEYS
 	cat $2 | while IFS= read -r line; do 		
 		DIFF_FILE=$(mktemp)
-		KEY_FILE=${REPO_KEYS}/private_keys-hash_${line}
+		KEY_FILE=${REPO_KEYS}/findings_from_hash_${line}
 		git show $line | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $DIFF_FILE; 
 		awk '/^-----BEGIN [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{flag=1}/^-----END [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{print;flag=0}flag' $DIFF_FILE > $KEY_FILE
 		if [[ "$(wc -l $KEY_FILE | awk -F" " '{print $1}')" == "0" ]]; then
@@ -101,7 +101,7 @@ if [[ "$MODE" == "github_user" ]]; then
 		echo -e "\nThe provided github user account \"$PAYLOAD\" does not exist or is private."
 		exit 1	
 	else
-		echo "\nGithub user \"${PAYLOAD}\" exists."
+		echo -e "\nGithub user \"${PAYLOAD}\" exists."
 	fi
 	
 	USER_REPOS=$(mktemp)
@@ -135,7 +135,7 @@ else
 				exit 1
 			fi
 		else
-			echo "\nDirectory \"$PAYLOAD\" does not exist."
+			echo -e "\nDirectory \"$PAYLOAD\" does not exist."
 			exit 1
 		fi
 		echo -e "\nProcessing local repo \"$PAYLOAD\".\n"
@@ -146,7 +146,7 @@ else
 			echo -e "\nThe provided url \"$PAYLOAD\" does not exist or is private."
 			exit 1
 		else
-			echo "\nURL is reachable."
+			echo -e "\nURL is reachable."
 		fi
 		VALIDITY_CHECK=$(mktemp)
 		trufflehog $PAYLOAD > $VALIDITY_CHECK 2>&1	
@@ -162,6 +162,11 @@ else
 	process_repo $PAYLOAD $HASH_LIST $MODE
 fi
 
+if [[ "$(ls -1 $KEY_DIR | wc -l)" == "0" ]]; then	
+	rmdir $KEY_DIR > /dev/null 2>&1
+elif [[ "$MODE" == "github_user" ]]; then
+	echo -e "\nCollected keys for all repos at:\"$KEY_DIR\""
+fi
 
 echo -e "\n"
 exit 0
