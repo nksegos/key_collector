@@ -122,7 +122,7 @@ transverser(){
 
 ## Program start
 
-# Main execution. Depending on the mode selected different input sanitizations and checks take place to ensure smooth execution
+# Main execution. Depending on the mode selected different input sanitizations and checks take place to ensure smooth execution. Curl requests also tend to return weird exit codes so the instant exit on error is disabled for curl segments and for the truffleHog check for remote repos.
 if [[ "$MODE" == "github_user" ]]; then
 	set +e
 	URL_CHECK=$(curl -s --head "https://github.com/${PAYLOAD}/" | head -n 1 | awk -F" " '{print $(NF-1)" "$NF}')
@@ -173,6 +173,9 @@ else
 		echo -e "\nProcessing local repo \"$PAYLOAD\".\n"
 		hash_collector "git_url --repo_path $PAYLOAD" >  $HASH_LIST
 	elif [[ "$MODE" == "remote" ]]; then
+		if [[ "${PAYLOAD: -4}" == ".git" ]]; then # curl requests on dot git addresses return 301s
+			PAYLOAD=${PAYLOAD%????}
+		fi
 		set +e
 		URL_CHECK=$(curl -s --head "$PAYLOAD" | head -n 1 | awk -F" " '{print $(NF-1)" "$NF}')	
 		set -e
