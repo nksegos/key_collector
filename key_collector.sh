@@ -207,10 +207,11 @@ if [[ "$(ls -1 $KEY_DIR | wc -l)" == "0" ]]; then
 	rmdir $KEY_DIR > /dev/null 2>&1
 elif [[ "$MODE" == "github_user" ]]; then
 	echo -e "\nCollected keys for all repos at:\"$KEY_DIR\""
-else
-	read -r -p "Print collected keys? [Y/n] " USER_REPLY
+fi
 
-	case $USER_REPLY in
+read -r -p "Print collected keys? [Y/n] " USER_REPLY
+
+case $USER_REPLY in
     		[yY][eE][sS]|[yY])
  		PRINT_FLAG="True"
 		;;
@@ -223,12 +224,13 @@ else
 	*)
  		PRINT_FLAG="False"
  		;;
-	esac
-fi
+esac
+
 
 if [[ "$PRINT_FLAG" == "True" ]]; then
 	transverser $KEY_DIR
 fi
+
 echo -e "\n"
 # Program exit
 exit 0
