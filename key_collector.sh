@@ -56,7 +56,7 @@ hash_collector(){
 }
 
 process_repo(){
-if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then
+if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then	
 	echo -e "High signal entropy detected by regexes for repo \"$1\".\n"
 	if [[ "$3" == "remote" ]]; then
 		GIT_DIR=$(mktemp -d)
@@ -65,10 +65,11 @@ if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then
 	else
 		cd $1
 	fi
-		
+	REPO_KEYS=${KEY_DIR}/$(basename $(git remote get-url origin) | awk -F. '{print $1}')	
+	mkdir $REPO_KEYS
 	cat $2 | while IFS= read -r line; do 		
 		DIFF_FILE=$(mktemp)
-		KEY_FILE=${KEY_DIR}/private_key_$(echo $1 | awk -F/ '{print $NF}' | awk -F. '{print $1}')_${line}
+		KEY_FILE=${REPO_KEYS}/private_keys-hash_${line}
 		git show $line | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" > $DIFF_FILE; 
 		awk '/^-----BEGIN [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{flag=1}/^-----END [A-Z]* PRIVATE (KEY|KEY BLOCK)-----$/{print;flag=0}flag' $DIFF_FILE > $KEY_FILE
 		if [[ "$(wc -l $KEY_FILE | awk -F" " '{print $1}')" == "0" ]]; then
@@ -81,11 +82,11 @@ if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then
 		rm -rf $GIT_DIR > /dev/null 2>&1
 	fi
 
-	if [[ "$(ls -1 $KEY_DIR | wc -l)" == "0" ]]; then	
-		rmdir $KEY_DIR > /dev/null 2>&1
+	if [[ "$(ls -1 $REPO_KEYS | wc -l)" == "0" ]]; then	
+		rmdir $REPO_KEYS > /dev/null 2>&1
 		echo "No keys found for repo \"$1\"."
 	else
-		echo "Collected keys for repo \"$1\" at:\"$KEY_DIR\""
+		echo "Collected keys for repo \"$1\" at:\"$REPO_KEYS\""
 	fi
 else 
 	echo "No private keys detected through high signal regexes for repo \"$1\"."
@@ -97,10 +98,10 @@ fi
 if [[ "$MODE" == "github_user" ]]; then
 	URL_CHECK=$(curl -s --head "https://github.com/${PAYLOAD}/" | head -n 1 | awk -F" " '{print $(NF-1)" "$NF}')
 	if [[ "${URL_CHECK%?}" != "200 OK" ]] && [[ "${URL_CHECK%?}" != "200 " ]]; then
-		echo "The provided github user account \"$PAYLOAD\" does not exist or is private."
+		echo -e "\nThe provided github user account \"$PAYLOAD\" does not exist or is private."
 		exit 1	
 	else
-		echo "Github user \"${PAYLOAD}\" exists."
+		echo "\nGithub user \"${PAYLOAD}\" exists."
 	fi
 	
 	USER_REPOS=$(mktemp)
@@ -123,7 +124,7 @@ if [[ "$MODE" == "github_user" ]]; then
 else
  	if [[ "$MODE" == "local" ]]; then
 		if [ -d $PAYLOAD ]; then
-	    		echo "Directory exists."
+	    		echo -e "\nDirectory exists."
 			if [[ "${PAYLOAD: -1}" == "/" ]]; then
 				PAYLOAD=${PAYLOAD%?}
 			fi
@@ -134,7 +135,7 @@ else
 				exit 1
 			fi
 		else
-			echo "Directory \"$PAYLOAD\" does not exist."
+			echo "\nDirectory \"$PAYLOAD\" does not exist."
 			exit 1
 		fi
 		echo -e "\nProcessing local repo \"$PAYLOAD\".\n"
@@ -142,10 +143,10 @@ else
 	elif [[ "$MODE" == "remote" ]]; then
 		URL_CHECK=$(curl -s --head "$PAYLOAD" | head -n 1 | awk -F" " '{print $(NF-1)" "$NF}')	
 		if [[ "${URL_CHECK%?}" != "200 OK" ]] && [[ "${URL_CHECK%?}" != "200 " ]]; then
-			echo "The provided url \"$PAYLOAD\" does not exist or is private."
+			echo -e "\nThe provided url \"$PAYLOAD\" does not exist or is private."
 			exit 1
 		else
-			echo "URL is reachable."
+			echo "\nURL is reachable."
 		fi
 		VALIDITY_CHECK=$(mktemp)
 		trufflehog $PAYLOAD > $VALIDITY_CHECK 2>&1	
