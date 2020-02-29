@@ -1,7 +1,7 @@
 # crypto_2019
 
 ## Usage
-./key_collector.sh -m <strong>\<MODE\></strong> -p <strong> \<PAYLOAD\></strong>
+./key_collector.sh -m <strong>MODE</strong> -p <strong>PAYLOAD</strong>
 
 ### PARAMETERS
 - <strong> MODE </strong>: Can be "local", "remote" or "github_user". Depending on the locality of the repository to be checked or if all the repositories of a specific github user are to be checked.  
