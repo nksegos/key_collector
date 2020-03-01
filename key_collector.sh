@@ -10,64 +10,21 @@ PRINT_FLAG="False"
 USER_REPLY=""
 
 ## Set bash strict mode
-set -e
-set -u
-set -o pipefail
+set -e # Stop the execution if any program used exits with a non-zero code
+set -u # Stop the execution if any reference to an unboun variable is made
+set -o pipefail # Disable pipeline failure masking
 
-## Define help function
-Usage(){
-echo -e "\nUsage:"
-echo    " 		-m PROCESSING_MODE 	Sets the operating scope to: local, remote or github_user. The default mode is local."
-echo 	" 		-p PAYLOAD 		Depending on the PROCESSING_MODE, sets the local repo path, the remote repo url or the github_user's name."
-echo  	" 		-h 			Display usage guide."
-echo -e "\nDefaults:"
-echo 	" 		MODE 	-> \"local\" "
-echo    " 		PAYLOAD -> \$PWD: \"$(pwd)\" "
-}
-
-## Arg parsing
-while getopts "m:p:h" opt; do
-	case $opt in
-		m)
-			MODE=$OPTARG
-			;;
-		p)
-			PAYLOAD=$OPTARG
-			;;
-		h)
-			Usage
-			exit 0
-			;;
-		\?)
-			echo "Invalid option: -$OPTARG."
-			Usage
-			exit 1
-			;;
-		:)
-			echo "Option -$OPTARG requires an argument."
-			Usage
-			exit 1
-			;;
-	esac
-done
-
-# Very basic input sanitization
-if [[ "$MODE" != "local" ]] && [[ "$MODE" != "remote" ]] && [[ "$MODE" != "github_user" ]]; then
-	echo -e "\nBad arguments!"
-	Usage
-	exit 1
-fi
 
 ## Define functions
 
-# Collect hashes with private keys from a repo. truffleHog exits with code 1 if it detects anything, so we have to turn off the error instant exit for this operation
+# Collect hashes with private keys from a repo. truffleHog exits with 1 if it detects anything, so we have to turn off the error instant exit for this operation
 hash_collector(){
 	set +e
 	trufflehog --regex  --entropy=False $(echo $1) | grep "Reason: .* key" -A 2 | grep "Hash:" | awk -F" " '{print $2}' | sort -u | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" 
 	set -e
 }
 
-# Loop through the collected hashes, git show each of them, strip the =/- signs and the color metadata and pass them through the private key regex. If repo is remote it's cloned, processed and then deleted. Any key detected by the regex gets saved as $KEY_DIR/$REPO_NAME/findings_from_hash_$COMMIT_HASH
+# Loop through the collected hashes, git show each of them, strip the =/- signs and the color metadata and pass them through the private key regex. If repo is remote, it's cloned, processed and then deleted. Any key detected by the regex gets saved as $KEY_DIR/$REPO_NAME/findings_from_hash_$COMMIT_HASH
 process_repo(){
 if [[ "$(wc -l $2 | awk -F" " '{print $1}')" -ne "0" ]]; then	
 	echo -e "High signal entropy detected by regexes for repo \"$1\".\n"
@@ -119,6 +76,50 @@ transverser(){
 		fi
     	done
 }
+
+# Define help function
+Usage(){
+echo -e "\nUsage:"
+echo    " 		-m PROCESSING_MODE 	Sets the operating scope to: local, remote or github_user. The default mode is local."
+echo 	" 		-p PAYLOAD 		Depending on the PROCESSING_MODE, sets the local repo path, the remote repo url or the github_user's name."
+echo  	" 		-h 			Display usage guide."
+echo -e "\nDefaults:"
+echo 	" 		MODE 	-> \"local\" "
+echo    " 		PAYLOAD -> \$PWD: \"$(pwd)\" "
+}
+
+## Arg parsing
+while getopts "m:p:h" opt; do
+	case $opt in
+		m)
+			MODE=$OPTARG # Set processing mode
+			;;
+		p)
+			PAYLOAD=$OPTARG # Set processing payload
+			;;
+		h)
+			Usage
+			exit 0
+			;;
+		\?)
+			echo "Invalid option: -$OPTARG."
+			Usage
+			exit 1
+			;;
+		:)
+			echo "Option -$OPTARG requires an argument."
+			Usage
+			exit 1
+			;;
+	esac
+done
+
+# Very basic input sanitization
+if [[ "$MODE" != "local" ]] && [[ "$MODE" != "remote" ]] && [[ "$MODE" != "github_user" ]]; then
+	echo -e "\nBad arguments!"
+	Usage
+	exit 1
+fi
 
 ## Program start
 
