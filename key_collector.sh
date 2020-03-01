@@ -74,11 +74,11 @@ fi
 }
 
 # Transverse through the $KEY_DIR and print all relevant findings
-transverser(){
+key_transverser(){
 	cd $1
 	for file in $1/*;do 	
 		if [ -d "$file" ]; then 
-			transverser "$file"
+			key_transverser "$file"
 			cd ..
 		else
 			echo -e "\n$file\n"
@@ -221,13 +221,13 @@ read -r -p "Print collected keys? [Y/n] " USER_REPLY
 
 case $USER_REPLY in
     		[yY][eE][sS]|[yY])
- 		transverser $KEY_DIR
+ 		key_transverser $KEY_DIR
 		;;
     		[nN][oO]|[nN])
  		true
        		;;
 	"")
-		transverser $KEY_DIR	
+		key_transverser $KEY_DIR	
 		;;
 	*)
  		true
