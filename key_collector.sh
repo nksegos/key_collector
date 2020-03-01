@@ -5,7 +5,6 @@ MODE="local"
 PAYLOAD=$(pwd)
 HASH_LIST=$(mktemp)
 KEY_DIR=$(mktemp -d)
-PRINT_FLAG="False"
 USER_REPLY=""
 
 ## Set bash strict mode
@@ -222,23 +221,19 @@ read -r -p "Print collected keys? [Y/n] " USER_REPLY
 
 case $USER_REPLY in
     		[yY][eE][sS]|[yY])
- 		PRINT_FLAG="True"
+ 		transverser $KEY_DIR
 		;;
     		[nN][oO]|[nN])
- 		PRINT_FLAG="False"
+ 		true
        		;;
 	"")
-		PRINT_FLAG="True"	
+		transverser $KEY_DIR	
 		;;
 	*)
- 		PRINT_FLAG="False"
+ 		true
  		;;
 esac
 
-
-if [[ "$PRINT_FLAG" == "True" ]]; then
-	transverser $KEY_DIR
-fi
 
 if [[ "$MODE" == "github_user" ]]; then
 	echo -e "\nCollected keys for all repos at:\"$KEY_DIR\""
