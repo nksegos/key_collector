@@ -4,7 +4,6 @@
 MODE="local"
 PAYLOAD=$(pwd)
 HASH_LIST=$(mktemp)
-DIFF_FILE=$(mktemp)
 KEY_DIR=$(mktemp -d)
 PRINT_FLAG="False"
 USER_REPLY=""
