@@ -207,7 +207,7 @@ else
 fi
 
 
-# Final cleanup or key printing
+# Final cleanup and/or key printing
 rm -f $HASH_LIST > /dev/null 2>&1
 
 if [[ "$(ls -1 $KEY_DIR | wc -l)" == "0" ]]; then	
