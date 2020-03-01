@@ -17,6 +17,18 @@ set -o pipefail # Disable pipeline failure masking
 
 ## Define functions
 
+## Define help function
+Usage(){
+	echo -e "\nUsage:"
+	echo    " 		-m PROCESSING_MODE 	Sets the operating scope to: local, remote or github_user. The default mode is local."
+	echo 	" 		-p PAYLOAD 		Depending on the PROCESSING_MODE, sets the local repo path, the remote repo url or the github_user's name."
+	echo  	" 		-h 			Display usage guide."
+	echo -e "\nDefaults:"
+	echo 	" 		MODE 	-> \"local\" "
+	echo    " 		PAYLOAD -> \$PWD: \"$(pwd)\" "
+}
+
+
 # Collect hashes with private keys from a repo. truffleHog exits with 1 if it detects anything, so we have to turn off the error instant exit for this operation
 hash_collector(){
 	set +e
@@ -77,19 +89,10 @@ transverser(){
     	done
 }
 
-# Define help function
-Usage(){
-echo -e "\nUsage:"
-echo    " 		-m PROCESSING_MODE 	Sets the operating scope to: local, remote or github_user. The default mode is local."
-echo 	" 		-p PAYLOAD 		Depending on the PROCESSING_MODE, sets the local repo path, the remote repo url or the github_user's name."
-echo  	" 		-h 			Display usage guide."
-echo -e "\nDefaults:"
-echo 	" 		MODE 	-> \"local\" "
-echo    " 		PAYLOAD -> \$PWD: \"$(pwd)\" "
-}
+set +u # Avoid having double error triggering by unbound variable checks on the argparse block, as the argparser will autotrigger if an arg is not complete
 
 ## Arg parsing
-while getopts "m:p:h" opt; do
+while getopts ":m:p:h" opt; do
 	case $opt in
 		m)
 			MODE=$OPTARG # Set processing mode
@@ -113,6 +116,7 @@ while getopts "m:p:h" opt; do
 			;;
 	esac
 done
+set -u # Re-enable unbound variable check
 
 # Very basic input sanitization
 if [[ "$MODE" != "local" ]] && [[ "$MODE" != "remote" ]] && [[ "$MODE" != "github_user" ]]; then
@@ -120,6 +124,8 @@ if [[ "$MODE" != "local" ]] && [[ "$MODE" != "remote" ]] && [[ "$MODE" != "githu
 	Usage
 	exit 1
 fi
+
+
 
 ## Program start
 
