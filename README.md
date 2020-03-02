@@ -1,6 +1,6 @@
 # key_collector
 
-A general purpose bash wrapper for extracting private keys for repositories. Done as a semester assignment.
+A relatively lightweight bash wrapper for trufflehog with the sole purpose of extracting private keys from repositories. Done as a semester assignment.
 
 ## Usage
 ./key_collector.sh -m <strong>MODE</strong> -p <strong>PAYLOAD</strong>
