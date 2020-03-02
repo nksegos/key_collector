@@ -103,7 +103,7 @@ while getopts ":m:p:h" opt; do
 			exit 0
 			;;
 		\?)
-			echo "Invalid option: -$OPTARG."
+			echo "Invalid option: -$OPTARG"
 			Usage
 			exit 1
 			;;

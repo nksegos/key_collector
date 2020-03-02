@@ -1,4 +1,6 @@
-# crypto_2019
+# key_collector
+
+A general purpose bash wrapper for extracting private keys for repositories. Done as a semester assignment.
 
 ## Usage
 ./key_collector.sh -m <strong>MODE</strong> -p <strong>PAYLOAD</strong>
@@ -10,11 +12,4 @@
 ### DEFAULTS
 - <strong> MODE </strong>: local
 - <strong> PAYLOAD </strong>: $PWD
-## Things that can be added
-Cookie, if you think that some of this shit is unneeded just cross it off and of course if you feel like something's missing, add it below.
 
-- (<strong>UNEEDED</strong>)Parallelism on user-based processing.
-- (<strong>UNEEDED</strong>)Multiple types of processing with one script execution through parameter file.
-- (<strong>UNEEDED</strong>)Parallelism for the idea above ^^.
-- (<strong>IMPLEMENTED AS OPTIONAL KEY PRINT AT THE END OF EXECUTION</strong>)Live printing of found keys on console
-- (<strong>DONE</strong>)Grouping of keys on directories named after the repo 
